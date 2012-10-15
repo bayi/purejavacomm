@@ -8,7 +8,9 @@ some additional patches to the original repository at https://github.com/nyholku
 Changes that this fork offer are:
 
 * support for 460k8 and 921k6 baud rates on non OSX platforms;
-* provide an OSGi-enabled version of PureJavacomm.
+* provide an OSGi-enabled version of PureJavacomm;
+* provide a preliminary fix for issue #12 of PureJavacomm;
+* provide a fix for a possible division by zero on Linux.
 
 These changes are provided as-is, for sake of improvement of the PureJavacomm library. 
 
