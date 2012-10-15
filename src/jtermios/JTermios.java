@@ -33,6 +33,7 @@ package jtermios;
 import static jtermios.JTermios.JTermiosLogging.*;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 import com.sun.jna.Platform;
 import com.sun.jna.Structure;
@@ -55,9 +56,9 @@ public class JTermios {
 	// or somewhere else. Handling the offset requires a buffer to hold 
 	// temporarily the bytes. I deemed that it is better to pass the buck ie burden 
 	// to the clients of JTermios as they know better what size of buffer (if any) 
-	// is best and because then the implementation that buffer is in one place, 
+	// is best and because then the implementation of that buffer is in one place, 
 	// not in each of the JTermiosImpl classes. In this way Mac OS X (and presumably
-	// Linux/Unix) does not a buffer at all in JTermiosImpl. Windows needs a
+	// Linux/Unix) does need not a buffer at all in JTermiosImpl. Windows needs a
 	// JNA Memory buffer anyway because of the limitations inherent in using 
 	// Overlapped I/O with JNA.
 
@@ -204,11 +205,14 @@ public class JTermios {
 	private static JTermiosInterface m_Termios;
 
 	public interface JTermiosInterface {
+
 		void shutDown();
 
 		int errno();
 
 		int fcntl(int fd, int cmd, int arg);
+
+		int setspeed(int fd, Termios termios, int speed);
 
 		int cfgetispeed(Termios termios);
 
@@ -261,6 +265,8 @@ public class JTermios {
 		void FD_ZERO(FDSet set);
 
 		List<String> getPortList();
+
+		public String getPortNamePattern();
 	}
 
 	public void shutdown() {
@@ -280,9 +286,11 @@ public class JTermios {
 		} else if (Platform.isWindows()) {
 			m_Termios = new jtermios.windows.JTermiosImpl();
 		} else if (Platform.isLinux()) {
-			m_Termios = Platform.is64Bit() ? new jtermios.linux.JTermiosImpl64b() : new jtermios.linux.JTermiosImpl();
+			m_Termios = new jtermios.linux.JTermiosImpl();
 		} else if (Platform.isSolaris()) {
 			m_Termios = new jtermios.solaris.JTermiosImpl();
+		} else if (Platform.isFreeBSD()) {
+			m_Termios = new jtermios.freebsd.JTermiosImpl();
 		} else {
 			log(0, "JTermios has no support for OS %s\n", System.getProperty("os.name"));
 		}
@@ -330,6 +338,13 @@ public class JTermios {
 		return ret;
 	}
 
+	static public int setspeed(int fd, Termios termios, int speed) {
+		log = log && log(5, "> setspeed(%d,%s,%d)\n", fd, termios, speed);
+		int ret = m_Termios.setspeed(fd, termios, speed);
+		log = log && log(3, "< setspeed(%d,%s,%d) => %d\n", fd, termios, speed, ret);
+		return ret;
+	}
+
 	static public int tcflush(int a, int b) {
 		log = log && log(5, "> tcflush(%d,%d)\n", a, b);
 		int ret = m_Termios.tcflush(a, b);
@@ -342,6 +357,12 @@ public class JTermios {
 		int ret = m_Termios.tcdrain(fd);
 		log = log && log(3, "< tcdrain(%d) => %d\n", fd, ret);
 		return ret;
+	}
+
+	static public void cfmakeraw(int fd, Termios termios) {
+		log = log && log(5, "> cfmakeraw(%d,%s)\n", fd, termios);
+		m_Termios.cfmakeraw(termios);
+		log = log && log(3, "< cfmakeraw(%d,%s)\n", fd, termios);
 	}
 
 	static public int tcgetattr(int fd, Termios termios) {
@@ -454,6 +475,15 @@ public class JTermios {
 	static public List<String> getPortList() {
 		return m_Termios.getPortList();
 
+	}
+
+	static public Pattern getPortNamePattern(jtermios.JTermios.JTermiosInterface jtermios) {
+		String ps = System.getProperty("purejavacomm.portnamepattern." + jtermios.getClass().getName());
+		if (ps == null)
+			ps = System.getProperty("purejavacomm.portnamepattern");
+		if (ps == null)
+			ps = jtermios.getPortNamePattern();
+		return Pattern.compile(ps);
 	}
 
 	public static class JTermiosLogging {

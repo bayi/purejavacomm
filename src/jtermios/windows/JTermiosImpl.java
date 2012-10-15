@@ -30,9 +30,11 @@
 
 package jtermios.windows;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import com.sun.jna.*;
 import com.sun.jna.ptr.IntByReference;
@@ -51,6 +53,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 	private volatile Hashtable<Integer, Port> m_OpenPorts = new Hashtable<Integer, Port>();
 
+	
+	
 	private class Port {
 		volatile int m_FD = -1;
 		volatile boolean m_Locked;
@@ -969,7 +973,12 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		return s.toString();
 	}
 
+	public String getPortNamePattern() {
+		return "^COM.*";
+	}
+
 	public List<String> getPortList() {
+		Pattern p = JTermios.getPortNamePattern(this);
 		char[] buffer;
 		int size = 0;
 		for (size = 16 * 1024; size < 256 * 1024; size *= 2) {
@@ -980,7 +989,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 				int offset = 0;
 				String port;
 				while ((port = getString(buffer, offset)).length() > 0) {
-					if (port.startsWith("COM"))
+					if (p.matcher(port).matches())
 						list.add(port);
 
 					offset += port.length() + 1;
@@ -1008,6 +1017,85 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 				e.printStackTrace();
 			}
 		}
+	}
 
+	public int setspeed(int fd, Termios termios, int speed) {
+		int br = speed;
+		switch (speed) {
+			case 50:
+				br = B50;
+				break;
+			case 75:
+				br = B75;
+				break;
+			case 110:
+				br = B110;
+				break;
+			case 134:
+				br = B134;
+				break;
+			case 150:
+				br = B150;
+				break;
+			case 200:
+				br = B200;
+				break;
+			case 300:
+				br = B300;
+				break;
+			case 600:
+				br = B600;
+				break;
+			case 1200:
+				br = B1200;
+				break;
+			case 1800:
+				br = B1800;
+				break;
+			case 2400:
+				br = B2400;
+				break;
+			case 4800:
+				br = B4800;
+				break;
+			case 9600:
+				br = B9600;
+				break;
+			case 19200:
+				br = B19200;
+				break;
+			case 38400:
+				br = B38400;
+				break;
+			case 7200:
+				br = B7200;
+				break;
+			case 14400:
+				br = B14400;
+				break;
+			case 28800:
+				br = B28800;
+				break;
+			case 57600:
+				br = B57600;
+				break;
+			case 76800:
+				br = B76800;
+				break;
+			case 115200:
+				br = B115200;
+				break;
+			case 230400:
+				br = B230400;
+				break;
+		}
+		int r;
+		if ((r = cfsetispeed(termios, br)) != 0)
+			return r;
+		if ((r = cfsetospeed(termios, br)) != 0)
+			return r;
+		if ((r = tcsetattr(fd, TCSANOW, termios)) != 0)
+			return r;
+		return 0;
 	}
 }

@@ -16,6 +16,5 @@ These changes are provided as-is, for sake of improvement of the PureJavacomm li
 
 See <http://www.sparetimelabs.com/purejavacomm/index.html>, last section for license details.
 
-The copyright of all changes made in this fork are hereby transferred to the original owner of 
-PureJavacomm, Kustaa "Kusti" Nyholm. 
+The copyright of all changes made in this fork are hereby transferred to the original owner of PureJavacomm, Kustaa "Kusti" Nyholm. 
 

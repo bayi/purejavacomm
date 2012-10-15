@@ -37,17 +37,22 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import jtermios.FDSet;
 
+import jtermios.JTermios;
 import jtermios.Pollfd;
 import jtermios.Termios;
 import jtermios.TimeVal;
+import jtermios.JTermios.JTermiosInterface;
 import jtermios.linux.JTermiosImpl.Linux_C_lib.pollfd;
+import jtermios.linux.JTermiosImpl.Linux_C_lib.serial_struct;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLong;
+import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.NativeLongByReference;
@@ -59,12 +64,51 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	private static String DEVICE_DIR_PATH = "/dev/";
 	static Linux_C_lib m_Clib = (Linux_C_lib) Native.loadLibrary("c", Linux_C_lib.class);
 
+	private final static int TIOCGSERIAL = 0x0000541E;
+	private final static int TIOCSSERIAL = 0x0000541F;
+
+	private final static int ASYNC_SPD_MASK = 0x00001030;
+	private final static int ASYNC_SPD_CUST = 0x00000030;
+
+	private final static int[] m_BaudRates = { //
+	50, 0000001, //
+			75, 0000002, //
+			110, 0000003, //
+			134, 0000004, //
+			150, 0000005, //
+			200, 0000006, //
+			300, 0000007, //
+			600, 0000010, //
+			1200, 0000011, //
+			1800, 0000012, //
+			2400, 0000013, //
+			4800, 0000014, //
+			9600, 0000015, //
+			19200, 0000016, //
+			38400, 0000017, //
+			57600, 0010001, //
+			115200, 0010002, //
+			230400, 0010003, //
+			460800, 0010004, //
+			500000, 0010005, //
+			576000, 0010006, //
+			921600, 0010007, //
+			1000000, 0010010, //
+			1152000, 0010011, //
+			1500000, 0010012, //
+			2000000, 0010013, //
+			2500000, 0010014, //
+			3000000, 0010015, //
+			3500000, 0010016, //
+			4000000, 0010017 //
+	};
+
 	public interface Linux_C_lib extends com.sun.jna.Library {
 		public IntByReference __error();
 
 		public int tcdrain(int fd);
 
-		public void cfmakeraw(Termios termios);
+		public void cfmakeraw(termios termios);
 
 		public int fcntl(int fd, int cmd, int[] arg);
 
@@ -72,21 +116,23 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 		public int ioctl(int fd, int cmd, int[] arg);
 
+		public int ioctl(int fd, int cmd, serial_struct arg);
+
 		public int open(String path, int flags);
 
 		public int close(int fd);
 
-		public int tcgetattr(int fd, Termios termios);
+		public int tcgetattr(int fd, termios termios);
 
-		public int tcsetattr(int fd, int cmd, Termios termios);
+		public int tcsetattr(int fd, int cmd, termios termios);
 
-		public int cfsetispeed(Termios termios, NativeLong i);
+		public int cfsetispeed(termios termios, NativeLong i);
 
-		public int cfsetospeed(Termios termios, NativeLong i);
+		public int cfsetospeed(termios termios, NativeLong i);
 
-		public NativeLong cfgetispeed(Termios termios);
+		public NativeLong cfgetispeed(termios termios);
 
-		public NativeLong cfgetospeed(Termios termios);
+		public NativeLong cfgetospeed(termios termios);
 
 		public NativeLong write(int fd, ByteBuffer buffer, NativeLong count);
 
@@ -124,19 +170,42 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			}
 		}
 
-		static public class Termios extends Structure {
+		public static class serial_struct extends Structure {
+			public int type;
+			public int line;
+			public int port;
+			public int irq;
+			public int flags;
+			public int xmit_fifo_size;
+			public int custom_divisor;
+			public int baud_base;
+			public short close_delay;
+			public short io_type;
+			//public char io_type;
+			//public char reserved_char;
+			public int hub6;
+			public short closing_wait;
+			public short closing_wait2;
+			public Pointer iomem_base;
+			public short iomem_reg_shift;
+			public int port_high;
+			public NativeLong iomap_base;
+		};
+
+		static public class termios extends Structure {
 			public int c_iflag;
 			public int c_oflag;
 			public int c_cflag;
 			public int c_lflag;
+			public byte c_line;
 			public byte[] c_cc = new byte[32];
 			public int c_ispeed;
 			public int c_ospeed;
 
-			public Termios() {
+			public termios() {
 			}
 
-			public Termios(jtermios.Termios t) {
+			public termios(jtermios.Termios t) {
 				c_iflag = t.c_iflag;
 				c_oflag = t.c_oflag;
 				c_cflag = t.c_cflag;
@@ -156,6 +225,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 				t.c_ospeed = c_ospeed;
 			}
 		}
+
 	}
 
 	static private class FDSetImpl extends FDSet {
@@ -181,8 +251,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		F_GETFL = 0x00000003;
 		F_SETFL = 0x00000004;
 		//errno.h stuff
-		EAGAIN = 35;
-		EACCES = 22;
+		EAGAIN = 11;
+		EACCES = 13;
 		EEXIST = 17;
 		EINTR = 4;
 		EINVAL = 22;
@@ -259,7 +329,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		B200 = 6;
 		B300 = 7;
 		B600 = 8;
-		B1200 = 8;
+		B1200 = 9;
 		B1800 = 10;
 		B2400 = 11;
 		B4800 = 12;
@@ -284,8 +354,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public void cfmakeraw(Termios termios) {
-		Linux_C_lib.Termios t = new Linux_C_lib.Termios(termios);
+		Linux_C_lib.termios t = new Linux_C_lib.termios(termios);
 		m_Clib.cfmakeraw(t);
+		t.update(termios);
 	}
 
 	public int fcntl(int fd, int cmd, int[] arg) {
@@ -301,22 +372,22 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int cfgetispeed(Termios termios) {
-		return m_Clib.cfgetispeed(new Linux_C_lib.Termios(termios)).intValue();
+		return m_Clib.cfgetispeed(new Linux_C_lib.termios(termios)).intValue();
 	}
 
 	public int cfgetospeed(Termios termios) {
-		return m_Clib.cfgetospeed(new Linux_C_lib.Termios(termios)).intValue();
+		return m_Clib.cfgetospeed(new Linux_C_lib.termios(termios)).intValue();
 	}
 
 	public int cfsetispeed(Termios termios, int speed) {
-		Linux_C_lib.Termios t = new Linux_C_lib.Termios(termios);
+		Linux_C_lib.termios t = new Linux_C_lib.termios(termios);
 		int ret = m_Clib.cfsetispeed(t, new NativeLong(speed));
 		t.update(termios);
 		return ret;
 	}
 
 	public int cfsetospeed(Termios termios, int speed) {
-		Linux_C_lib.Termios t = new Linux_C_lib.Termios(termios);
+		Linux_C_lib.termios t = new Linux_C_lib.termios(termios);
 		int ret = m_Clib.cfsetospeed(t, new NativeLong(speed));
 		t.update(termios);
 		return ret;
@@ -345,7 +416,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int tcgetattr(int fd, Termios termios) {
-		Linux_C_lib.Termios t = new Linux_C_lib.Termios();
+		Linux_C_lib.termios t = new Linux_C_lib.termios();
 		int ret = m_Clib.tcgetattr(fd, t);
 		t.update(termios);
 		return ret;
@@ -362,7 +433,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int tcsetattr(int fd, int cmd, Termios termios) {
-		return m_Clib.tcsetattr(fd, cmd, new Linux_C_lib.Termios(termios));
+		return m_Clib.tcsetattr(fd, cmd, new Linux_C_lib.termios(termios));
 	}
 
 	public void FD_CLR(int fd, FDSet set) {
@@ -408,7 +479,10 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		pollfd[] pfds = new pollfd[fds.length];
 		for (int i = 0; i < nfds; i++)
 			pfds[i] = new pollfd(fds[i]);
-		return m_Clib.poll(pfds, nfds, timeout);
+        int ret = m_Clib.poll(pfds, nfds, timeout);
+        for(int i = 0; i < nfds; i++)
+            fds[i].revents = pfds[i].revents;
+		return ret;
 	}
 
 	public FDSet newFDSet() {
@@ -419,6 +493,19 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		return m_Clib.ioctl(fd, cmd, data);
 	}
 
+	// This ioctl is Linux specific, so keep it private for now
+	private int ioctl(int fd, int cmd, serial_struct data) {
+		// Do the logging here as this does not go through the JTermios which normally does the logging
+		log = log && log(5, "> ioctl(%d,%d,%s)\n", fd, cmd, data);
+		int ret = m_Clib.ioctl(fd, cmd, data);
+		log = log && log(3, "< tcsetattr(%d,%d,%s) => %d\n", fd, cmd, data, ret);
+		return ret;
+	}
+
+	public String getPortNamePattern() {
+		return "^tty.*";
+	}
+
 	public List<String> getPortList() {
 		File dir = new File(DEVICE_DIR_PATH);
 		if (!dir.isDirectory()) {
@@ -427,19 +514,77 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		}
 		String[] devs = dir.list();
 		LinkedList<String> list = new LinkedList<String>();
+
+		Pattern p = JTermios.getPortNamePattern(this);
 		if (devs != null) {
 			for (int i = 0; i < devs.length; i++) {
 				String s = devs[i];
-				if (s.startsWith("tty"))
+				if (p.matcher(s).matches())
 					list.add(s);
 			}
-
 		}
-
 		return list;
 	}
 
 	public void shutDown() {
 
+	}
+
+	public int setspeed(int fd, Termios termios, int speed) {
+		int c = speed;
+		int r;
+		for (int i = 0; i < m_BaudRates.length; i += 2) {
+			if (m_BaudRates[i] == speed) {
+
+				// found the baudrate from the table
+
+				// in case custom divisor was in use, turn it off first
+				serial_struct ss = new serial_struct();
+
+				// not every driver supports TIOCGSERIAL, so if it fails, just ignore it
+				if ((r = ioctl(fd, TIOCGSERIAL, ss)) == 0) {
+					ss.flags &= ~ASYNC_SPD_MASK;
+					if ((r = ioctl(fd, TIOCSSERIAL, ss)) != 0)
+						return r;
+				}
+
+				// now set the speed with the constant from the table
+				c = m_BaudRates[i + 1];
+				if ((r = JTermios.cfsetispeed(termios, c)) != 0)
+					return r;
+				if ((r = JTermios.cfsetospeed(termios, c)) != 0)
+					return r;
+				if ((r = JTermios.tcsetattr(fd, TCSANOW, termios)) != 0)
+					return r;
+
+				return 0;
+			}
+		}
+
+		// baudrate not defined in the table, try custom divisor approach
+
+		// configure port to use custom speed instead of 38400
+		serial_struct ss = new serial_struct();
+		if ((r = ioctl(fd, TIOCGSERIAL, ss)) != 0)
+			return r;
+		ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
+		ss.custom_divisor = (ss.baud_base + (speed / 2)) / speed;
+		int closestSpeed = ss.baud_base / ss.custom_divisor;
+
+		if (closestSpeed < speed * 98 / 100 || closestSpeed > speed * 102 / 100) {
+			log = log && log(1, "best available baudrate %d not close enough to requested %d \n", closestSpeed, speed);
+			return -1;
+		}
+
+		if ((r = ioctl(fd, TIOCSSERIAL, ss)) != 0)
+			return r;
+
+		if ((r = JTermios.cfsetispeed(termios, B38400)) != 0)
+			return r;
+		if ((r = JTermios.cfsetospeed(termios, B38400)) != 0)
+			return r;
+		if ((r = JTermios.tcsetattr(fd, TCSANOW, termios)) != 0)
+			return r;
+		return 0;
 	}
 }

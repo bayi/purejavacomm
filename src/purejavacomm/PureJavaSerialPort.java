@@ -44,7 +44,7 @@ import com.sun.jna.Platform;
 
 public class PureJavaSerialPort extends SerialPort {
 
-	private static Thread m_Thread;
+	private Thread m_Thread;
 
 	private volatile SerialPortEventListener m_EventListener;
 
@@ -95,7 +95,7 @@ public class PureJavaSerialPort extends SerialPort {
 		}
 	}
 
-	private void sendNonDataEvents() {
+	private synchronized void sendNonDataEvents() {
 		if (ioctl(m_FD, TIOCMGET, m_ioctl) < 0)
 			return; //FIXME decide what to with errors in the background thread
 		int oldstates = m_ControlLineStates;
@@ -395,91 +395,7 @@ public class PureJavaSerialPort extends SerialPort {
 		prev.set(m_Termios);
 
 		try {
-			if (Platform.isMac()) {
-				int[] data = new int[] {baudRate};
-				checkReturnCode(ioctl(m_FD, IOSSIOSPEED, data));
-			} else {
-				int br = baudRate;
-				switch (baudRate) {
-					case 50:
-						br = B50;
-						break;
-					case 75:
-						br = B75;
-						break;
-					case 110:
-						br = B110;
-						break;
-					case 134:
-						br = B134;
-						break;
-					case 150:
-						br = B150;
-						break;
-					case 200:
-						br = B200;
-						break;
-					case 300:
-						br = B300;
-						break;
-					case 600:
-						br = B600;
-						break;
-					case 1200:
-						br = B1200;
-						break;
-					case 1800:
-						br = B1800;
-						break;
-					case 2400:
-						br = B2400;
-						break;
-					case 4800:
-						br = B4800;
-						break;
-					case 7200:
-						br = B7200;
-						break;
-					case 9600:
-						br = B9600;
-						break;
-					case 14400:
-						br = B14400;
-						break;
-					case 19200:
-						br = B19200;
-						break;
-					case 28800:
-						br = B28800;
-						break;
-					case 38400:
-						br = B38400;
-						break;
-					case 57600:
-						br = B57600;
-						break;
-					case 76800:
-						br = B76800;
-						break;
-					case 115200:
-						br = B115200;
-						break;
-					case 230400:
-						br = B230400;
-						break;
-			                case 460800:
-	        			        br = B460800;
-						break;
-					case 921600:
-						br = B921600;
-						break;
-				}
-				// try to set the baud rate before anything else
-				// as it may fail at 'tcsetattr' stage and in that
-				// case we do not want to change anything
-				checkReturnCode(cfsetispeed(m_Termios, br));
-				checkReturnCode(cfsetospeed(m_Termios, br));
-			}
+			checkReturnCode(setspeed(m_FD, m_Termios, baudRate));
 
 			int db;
 			switch (dataBits) {
@@ -742,7 +658,8 @@ public class PureJavaSerialPort extends SerialPort {
 			if (fcres != 0) // not much we can do if this fails, so just log it
 				log = log && log(1, "fcntl(%d,%d,%d) returned %d\n", m_FD, F_SETFL, flags, fcres);
 
-			m_Thread.interrupt();
+			if (m_Thread != null)
+				m_Thread.interrupt();
 			int err = jtermios.JTermios.close(fd);
 			if (err < 0)
 				log = log && log(1, "JTermios.close returned %d, errno %d\n", err, errno());
@@ -776,8 +693,6 @@ public class PureJavaSerialPort extends SerialPort {
 			if (tries-- < 0 || System.currentTimeMillis() - T0 >= timeout)
 				throw new PortInUseException();
 		}
-		while (m_FD < 0)
-			;
 
 		int flags = fcntl(m_FD, F_GETFL, 0);
 		flags &= ~O_NONBLOCK;
@@ -790,6 +705,9 @@ public class PureJavaSerialPort extends SerialPort {
 		m_StopBits = SerialPort.STOPBITS_1;
 
 		checkReturnCode(tcgetattr(m_FD, m_Termios));
+
+		cfmakeraw(m_FD, m_Termios);
+
 		m_Termios.c_cflag |= CLOCAL | CREAD;
 		m_Termios.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
 		m_Termios.c_oflag &= ~OPOST;
@@ -817,21 +735,22 @@ public class PureJavaSerialPort extends SerialPort {
 				try {
 					m_ThreadRunning = true;
 					// see: http://daniel.haxx.se/docs/poll-vs-select.html
-					final boolean USE_SELECT = true;
+					final boolean USE_POLL = Boolean.getBoolean("purejavacomm.use_poll") && Platform.isLinux();
 					final int TIMEOUT = 10; // msec
-					TimeVal timeout;
-					FDSet rset;
-					FDSet wset;
-					Pollfd[] pollfd;
+					TimeVal timeout = null;
+					FDSet rset = null;
+					FDSet wset = null;
+					Pollfd[] pollfd = null;
 
-					if (USE_SELECT) {
+					if (USE_POLL)
+						pollfd = new Pollfd[] { new Pollfd() };
+					else {
 						rset = newFDSet();
 						wset = newFDSet();
 						timeout = new TimeVal();
 						timeout.tv_sec = 0;
 						timeout.tv_usec = TIMEOUT * 1000; // 10 msec polling period
-					} else
-						pollfd = new Pollfd[] { new Pollfd() };
+					}
 
 					while (m_FD >= 0) { // lets die if the file descriptor dies on us ie the port closes
 						boolean read = (m_NotifyOnDataAvailable && !m_DataAvailableNotified);
@@ -840,17 +759,7 @@ public class PureJavaSerialPort extends SerialPort {
 						if (!read && !write)
 							Thread.sleep(TIMEOUT);
 						else { // do all this only if we actually wait for read or write
-							if (USE_SELECT) {
-								FD_ZERO(rset);
-								FD_ZERO(wset);
-								if (read)
-									FD_SET(m_FD, rset);
-								if (write)
-									FD_SET(m_FD, wset);
-								n = select(m_FD + 1, rset, wset, null, timeout);
-								read = read && FD_ISSET(m_FD, rset);
-								write = write && FD_ISSET(m_FD, wset);
-							} else { // use poll
+							if (USE_POLL) {
 								pollfd[0].fd = m_FD;
 								short e = 0;
 								if (read)
@@ -867,7 +776,18 @@ public class PureJavaSerialPort extends SerialPort {
 								}
 								read = read && (re & POLLIN) != 0;
 								write = write && (re & POLLOUT) != 0;
+							} else {
+								FD_ZERO(rset);
+								FD_ZERO(wset);
+								if (read)
+									FD_SET(m_FD, rset);
+								if (write)
+									FD_SET(m_FD, wset);
+								n = select(m_FD + 1, rset, wset, null, timeout);
+								read = read && FD_ISSET(m_FD, rset);
+								write = write && FD_ISSET(m_FD, wset);
 							}
+
 							if (Thread.currentThread().isInterrupted())
 								break;
 							if (n < 0) {

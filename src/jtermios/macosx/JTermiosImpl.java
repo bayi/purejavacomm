@@ -37,9 +37,11 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import jtermios.FDSet;
 
+import jtermios.JTermios;
 import jtermios.Pollfd;
 import jtermios.Termios;
 import jtermios.TimeVal;
@@ -56,6 +58,7 @@ import static jtermios.JTermios.*;
 import static jtermios.JTermios.JTermiosLogging.log;
 
 public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
+	private static int IOSSIOSPEED = 0x80045402;
 	private static String DEVICE_DIR_PATH = "/dev/";
 	static MacOSX_C_lib m_Clib = (MacOSX_C_lib) Native.loadLibrary("c", MacOSX_C_lib.class);
 
@@ -70,6 +73,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		public int fcntl(int fd, int cmd, int arg);
 
 		public int ioctl(int fd, int cmd, int[] arg);
+
+		public int ioctl(int fd, int cmd, NativeLong[] arg);
 
 		public int open(String path, int flags);
 
@@ -168,14 +173,15 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	public JTermiosImpl() {
 		log = log && log(1, "instantiating %s\n", getClass().getCanonicalName());
 	}
-	
+
 	public int errno() {
 		return Native.getLastError();
-		}
+	}
 
 	public void cfmakeraw(Termios termios) {
 		MacOSX_C_lib.Termios t = new MacOSX_C_lib.Termios(termios);
 		m_Clib.cfmakeraw(t);
+		t.update(termios);
 	}
 
 	public int fcntl(int fd, int cmd, int arg) {
@@ -292,7 +298,10 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		pollfd[] pfds = new pollfd[fds.length];
 		for (int i = 0; i < nfds; i++)
 			pfds[i] = new pollfd(fds[i]);
-		return m_Clib.poll(pfds, nfds, timeout);
+        int ret = m_Clib.poll(pfds, nfds, timeout);
+        for(int i = 0; i < nfds; i++)
+            fds[i].revents = pfds[i].revents;
+		return ret;
 	}
 
 	public FDSet newFDSet() {
@@ -300,6 +309,10 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int ioctl(int fd, int cmd, int[] data) {
+		return m_Clib.ioctl(fd, cmd, data);
+	}
+
+	public int ioctl(int fd, int cmd, NativeLong[] data) {
 		return m_Clib.ioctl(fd, cmd, data);
 	}
 
@@ -311,19 +324,40 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		}
 		String[] devs = dir.list();
 		LinkedList<String> list = new LinkedList<String>();
+
+		Pattern p = JTermios.getPortNamePattern(this);
 		if (devs != null) {
 			for (int i = 0; i < devs.length; i++) {
 				String s = devs[i];
-				if (s.startsWith("cu."))
+				if (p.matcher(s).matches())
 					list.add(s);
 			}
-
 		}
-
 		return list;
+	}
+
+	public String getPortNamePattern() {
+		return "^(tty\\.|cu\\.).*";
 	}
 
 	public void shutDown() {
 
+	}
+
+	public int setspeed(int fd, Termios termios, int speed) {
+		int r;
+		r = cfsetispeed(termios, speed);
+		if (r == 0)
+			r = cfsetospeed(termios, speed);
+		if (r == 0)
+			r = tcsetattr(fd, TCSANOW, termios);
+		if (r != 0) {
+			// Darell Tan had patched RXTX with this sequence, so lets try this
+			if (cfsetispeed(termios, B9600) == 0 && cfsetospeed(termios, B9600) == 0 && tcsetattr(fd, TCSANOW, termios) == 0) {
+				NativeLong[] data = new NativeLong[] { new NativeLong(speed) };
+				r = ioctl(fd, IOSSIOSPEED, data);
+			}
+		}
+		return r;
 	}
 }
