@@ -577,6 +577,10 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			return r;
 		ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
 		ss.custom_divisor = (ss.baud_base + (speed / 2)) / speed;
+		if (ss.custom_divisor == 0) {
+			log = log && log(1, "unable to set custom baudrate %d (possible division by zero)\n", speed);
+			return -1;
+		}
 		int closestSpeed = ss.baud_base / ss.custom_divisor;
 
 		if (closestSpeed < speed * 98 / 100 || closestSpeed > speed * 102 / 100) {
