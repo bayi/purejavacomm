@@ -1,13 +1,13 @@
-main-version: 0.0.8
-jna-version: 3.2.7
+Pjc-version: 0.0.9
+Jna-version: 3.5.1
 Bundle-Name: PureJavacomm Library
 Bundle-SymbolicName: purejavacomm
 Bundle-Description: PureJavacomm serial I/O library
 Bundle-Copyright: Kustaa "Kusti" Nyholm
 Bundle-License: "Simplified BSD License";http://www.sparetimelabs.com/purejavacomm/index.html
-Bundle-Version: ${main-version}
-Include-Resource: lib/jna.jar
-Bundle-ClassPath: .,jna.jar
+Bundle-Version: ${Pjc-version}
+Include-Resource: lib/jna-3.5.1.jar
+Bundle-ClassPath: jna-3.5.1.jar, .
 Private-Package: \
 	jtermios.linux,\
 	jtermios.macosx,\
