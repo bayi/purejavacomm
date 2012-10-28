@@ -35,6 +35,7 @@ import java.io.File;
 import java.nio.Buffer;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -104,8 +105,6 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	};
 
 	public interface Linux_C_lib extends com.sun.jna.Library {
-		public IntByReference __error();
-
 		public int tcdrain(int fd);
 
 		public void cfmakeraw(termios termios);
@@ -138,7 +137,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 		public NativeLong read(int fd, ByteBuffer buffer, NativeLong count);
 
-		public int select(int n, int[] read, int[] write, int[] error, TimeVal timeout);
+		public int select(int n, int[] read, int[] write, int[] error, timeval timeout);
 
 		public int poll(pollfd[] fds, int nfds, int timeout);
 
@@ -148,11 +147,19 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 		public int tcsendbreak(int fd, int duration);
 
-		static public class TimeVal extends Structure {
+		static public class timeval extends Structure {
 			public NativeLong tv_sec;
 			public NativeLong tv_usec;
 
-			public TimeVal(jtermios.TimeVal timeout) {
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"tv_sec",//
+						"tv_usec"//
+				);
+			}
+
+			public timeval(jtermios.TimeVal timeout) {
 				tv_sec = new NativeLong(timeout.tv_sec);
 				tv_usec = new NativeLong(timeout.tv_usec);
 			}
@@ -162,6 +169,15 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			public int fd;
 			public short events;
 			public short revents;
+
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"fd",//
+						"events",//
+						"revents"//
+				);
+			}
 
 			public pollfd(Pollfd pfd) {
 				fd = pfd.fd;
@@ -190,6 +206,31 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			public short iomem_reg_shift;
 			public int port_high;
 			public NativeLong iomap_base;
+
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"type",//
+						"line",//
+						"port",//
+						"irq",//
+						"flags",//
+						"xmit_fifo_size",//
+						"custom_divisor",//
+						"baud_base",//
+						"close_delay",//
+						"io_type",//
+						//public char io_type;
+						//public char reserved_char;
+						"hub6",//
+						"closing_wait",//
+						"closing_wait2",//
+						"iomem_base",//
+						"iomem_reg_shift",//
+						"port_high",//
+						"iomap_base"//
+				);
+			}
 		};
 
 		static public class termios extends Structure {
@@ -201,6 +242,19 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			public byte[] c_cc = new byte[32];
 			public int c_ispeed;
 			public int c_ospeed;
+
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"c_iflag",//
+						"c_oflag",//
+						"c_cflag",//
+						"c_lflag",//
+						"c_cc",//
+						"c_ispeed",//
+						"c_ospeed"//
+				);
+			}
 
 			public termios() {
 			}
@@ -465,9 +519,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int select(int nfds, FDSet rfds, FDSet wfds, FDSet efds, TimeVal timeout) {
-		Linux_C_lib.TimeVal tout = null;
+		Linux_C_lib.timeval tout = null;
 		if (timeout != null)
-			tout = new Linux_C_lib.TimeVal(timeout);
+			tout = new Linux_C_lib.timeval(timeout);
 
 		int[] r = rfds != null ? ((FDSetImpl) rfds).bits : null;
 		int[] w = wfds != null ? ((FDSetImpl) wfds).bits : null;
@@ -479,9 +533,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		pollfd[] pfds = new pollfd[fds.length];
 		for (int i = 0; i < nfds; i++)
 			pfds[i] = new pollfd(fds[i]);
-        int ret = m_Clib.poll(pfds, nfds, timeout);
-        for(int i = 0; i < nfds; i++)
-            fds[i].revents = pfds[i].revents;
+		int ret = m_Clib.poll(pfds, nfds, timeout);
+		for (int i = 0; i < nfds; i++)
+			fds[i].revents = pfds[i].revents;
 		return ret;
 	}
 
@@ -576,11 +630,19 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		if ((r = ioctl(fd, TIOCGSERIAL, ss)) != 0)
 			return r;
 		ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
+		
+		if (speed == 0) {
+			log = log && log(1, "unable to set custom baudrate %d \n", speed);
+			return -1;
+		}
+		
 		ss.custom_divisor = (ss.baud_base + (speed / 2)) / speed;
+
 		if (ss.custom_divisor == 0) {
 			log = log && log(1, "unable to set custom baudrate %d (possible division by zero)\n", speed);
 			return -1;
 		}
+		
 		int closestSpeed = ss.baud_base / ss.custom_divisor;
 
 		if (closestSpeed < speed * 98 / 100 || closestSpeed > speed * 102 / 100) {

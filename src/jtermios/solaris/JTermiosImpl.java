@@ -34,6 +34,7 @@ import java.io.File;
 import java.nio.Buffer;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -62,9 +63,6 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	static Solaris_C_lib m_Clib = (Solaris_C_lib) Native.loadLibrary("c", Solaris_C_lib.class);
 
 	public interface Solaris_C_lib extends com.sun.jna.Library {
-
-		public IntByReference __error();
-
 		public int tcdrain(int fd);
 
 		public int fcntl(int fd, int cmd, int[] arg);
@@ -77,23 +75,23 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 		public int close(int fd);
 
-		public int tcgetattr(int fd, Termios termios);
+		public int tcgetattr(int fd, termios termios);
 
-		public int tcsetattr(int fd, int cmd, Termios termios);
+		public int tcsetattr(int fd, int cmd, termios termios);
 
-		public int cfsetispeed(Termios termios, NativeLong i);
+		public int cfsetispeed(termios termios, NativeLong i);
 
-		public int cfsetospeed(Termios termios, NativeLong i);
+		public int cfsetospeed(termios termios, NativeLong i);
 
-		public NativeLong cfgetispeed(Termios termios);
+		public NativeLong cfgetispeed(termios termios);
 
-		public NativeLong cfgetospeed(Termios termios);
+		public NativeLong cfgetospeed(termios termios);
 
 		public NativeLong write(int fd, ByteBuffer buffer, NativeLong count);
 
 		public NativeLong read(int fd, ByteBuffer buffer, NativeLong count);
 
-		public int select(int n, int[] read, int[] write, int[] error, TimeVal timeout);
+		public int select(int n, int[] read, int[] write, int[] error, timeval timeout);
 
 		public int poll(pollfd[] fds, int nfds, int timeout);
 
@@ -103,12 +101,20 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 		public int tcsendbreak(int fd, int duration);
 
-		static public class TimeVal extends Structure {
+		static public class timeval extends Structure {
 
 			public NativeLong tv_sec;
 			public NativeLong tv_usec;
 
-			public TimeVal(jtermios.TimeVal timeout) {
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"tv_sec",//
+						"tv_usec"//
+				);
+			}
+
+			public timeval(jtermios.TimeVal timeout) {
 				tv_sec = new NativeLong(timeout.tv_sec);
 				tv_usec = new NativeLong(timeout.tv_usec);
 			}
@@ -120,6 +126,15 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			public short events;
 			public short revents;
 
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"fd",//
+						"events",//
+						"revents"//
+				);
+			}
+
 			public pollfd(Pollfd pfd) {
 				fd = pfd.fd;
 				events = pfd.events;
@@ -127,7 +142,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			}
 		}
 
-		static public class Termios extends Structure {
+		static public class termios extends Structure {
 
 			public int c_iflag;
 			public int c_oflag;
@@ -135,10 +150,21 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			public int c_lflag;
 			public byte[] c_cc = new byte[32];
 
-			public Termios() {
+			@Override
+			protected List getFieldOrder() {
+				return Arrays.asList(//
+						"c_iflag",//
+						"c_oflag",//
+						"c_cflag",//
+						"c_lflag",//
+						"c_cc"//
+				);
 			}
 
-			public Termios(jtermios.Termios t) {
+			public termios() {
+			}
+
+			public termios(jtermios.Termios t) {
 				c_iflag = t.c_iflag;
 				c_oflag = t.c_oflag;
 				c_cflag = t.c_cflag;
@@ -290,7 +316,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public void cfmakeraw(Termios termios) {
-		Solaris_C_lib.Termios t = new Solaris_C_lib.Termios(termios);
+		Solaris_C_lib.termios t = new Solaris_C_lib.termios(termios);
 		t.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
 		t.c_oflag &= ~OPOST;
 		t.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
@@ -312,22 +338,22 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int cfgetispeed(Termios termios) {
-		return m_Clib.cfgetispeed(new Solaris_C_lib.Termios(termios)).intValue();
+		return m_Clib.cfgetispeed(new Solaris_C_lib.termios(termios)).intValue();
 	}
 
 	public int cfgetospeed(Termios termios) {
-		return m_Clib.cfgetospeed(new Solaris_C_lib.Termios(termios)).intValue();
+		return m_Clib.cfgetospeed(new Solaris_C_lib.termios(termios)).intValue();
 	}
 
 	public int cfsetispeed(Termios termios, int speed) {
-		Solaris_C_lib.Termios t = new Solaris_C_lib.Termios(termios);
+		Solaris_C_lib.termios t = new Solaris_C_lib.termios(termios);
 		int ret = m_Clib.cfsetispeed(t, new NativeLong(speed));
 		t.update(termios);
 		return ret;
 	}
 
 	public int cfsetospeed(Termios termios, int speed) {
-		Solaris_C_lib.Termios t = new Solaris_C_lib.Termios(termios);
+		Solaris_C_lib.termios t = new Solaris_C_lib.termios(termios);
 		int ret = m_Clib.cfsetospeed(t, new NativeLong(speed));
 		t.update(termios);
 		return ret;
@@ -357,7 +383,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int tcgetattr(int fd, Termios termios) {
-		Solaris_C_lib.Termios t = new Solaris_C_lib.Termios();
+		Solaris_C_lib.termios t = new Solaris_C_lib.termios();
 		int ret = m_Clib.tcgetattr(fd, t);
 		t.update(termios);
 		return ret;
@@ -374,7 +400,7 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int tcsetattr(int fd, int cmd, Termios termios) {
-		return m_Clib.tcsetattr(fd, cmd, new Solaris_C_lib.Termios(termios));
+		return m_Clib.tcsetattr(fd, cmd, new Solaris_C_lib.termios(termios));
 	}
 
 	public void FD_CLR(int fd, FDSet set) {
@@ -410,9 +436,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	}
 
 	public int select(int nfds, FDSet rfds, FDSet wfds, FDSet efds, TimeVal timeout) {
-		Solaris_C_lib.TimeVal tout = null;
+		Solaris_C_lib.timeval tout = null;
 		if (timeout != null) {
-			tout = new Solaris_C_lib.TimeVal(timeout);
+			tout = new Solaris_C_lib.timeval(timeout);
 		}
 
 		int[] r = rfds != null ? ((FDSetImpl) rfds).bits : null;
@@ -425,9 +451,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		pollfd[] pfds = new pollfd[fds.length];
 		for (int i = 0; i < nfds; i++)
 			pfds[i] = new pollfd(fds[i]);
-        int ret = m_Clib.poll(pfds, nfds, timeout);
-        for(int i = 0; i < nfds; i++)
-            fds[i].revents = pfds[i].revents;
+		int ret = m_Clib.poll(pfds, nfds, timeout);
+		for (int i = 0; i < nfds; i++)
+			fds[i].revents = pfds[i].revents;
 		return ret;
 	}
 

@@ -1,22 +1,9 @@
-# PureJavacomm
+PureJavaComm is an Application Programmin Interface (API) for accessing serial ports from Java, so this is a library aimed at programmers, not end users.
 
-This is **not** the official PureJavacomm repository! It is a fork that is used to provide
-some additional patches to the original repository at https://github.com/nyholku/purejavacomm.
+PureJavaComm aims to be a drop-in replacement for Sun's (now Oracle) abandoned JavaComm and an easier to deploy alternative to RXTX.
 
-## Changes
+PJC is written 100% in Java so it is easy for Java programmers to develop and debug and it requires no native libraries. Native access to the underlaying operating system's serial port programming interface is provided by the wonderful JNA library which takes away all the pain of compiling and deploying native code.
 
-Changes that this fork offer are:
+PJC is BSD licensed but please note it depends on JNA which is LGPL licensed.
 
-* support for 460k8 and 921k6 baud rates on non OSX platforms;
-* provide an OSGi-enabled version of PureJavacomm;
-* provide a preliminary fix for issue #12 of PureJavacomm;
-* provide a fix for a possible division by zero on Linux.
-
-These changes are provided as-is, for sake of improvement of the PureJavacomm library. 
-
-## License
-
-See <http://www.sparetimelabs.com/purejavacomm/index.html>, last section for license details.
-
-The copyright of all changes made in this fork are hereby transferred to the original owner of PureJavacomm, Kustaa "Kusti" Nyholm. 
 
