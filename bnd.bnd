@@ -1,18 +1,21 @@
-Pjc-version: 0.0.9
-Jna-version: 3.5.1
+Pjc-Version: 0.0.16
+Jna-Version: 3.5.1.b22
 Bundle-Name: PureJavacomm Library
-Bundle-SymbolicName: purejavacomm
 Bundle-Description: PureJavacomm serial I/O library
 Bundle-Copyright: Kustaa "Kusti" Nyholm
 Bundle-License: "Simplified BSD License";http://www.sparetimelabs.com/purejavacomm/index.html
-Bundle-Version: ${Pjc-version}
-Include-Resource: lib/jna-3.5.1.jar
-Bundle-ClassPath: jna-3.5.1.jar, .
+Bundle-Version: 0.0.16
 Private-Package: \
+	jtermios.freebsd,\
 	jtermios.linux,\
 	jtermios.macosx,\
 	jtermios.solaris,\
-	jtermios.windows,\
-	jtermios.freebsd
-Export-Package: jtermios, purejavacomm
-Import-Package: *
+	jtermios.windows
+Export-Package: \
+    jtermios,\
+	purejavacomm
+Include-Resource: lib/jna-3.5.1.jar
+Bundle-ClassPath: jna-3.5.1.jar,.
+# -buildpath: lib/jna-3.5.1.jar;version=file
+# Bndtools needs to know we're using a different output folder
+bin: classes
