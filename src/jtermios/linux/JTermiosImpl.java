@@ -706,15 +706,17 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 
 				r = ioctl(fd, TIOCGSERIAL, ss);
 				if (r != 0) {
-					// not every driver supports TIOCGSERIAL, so if it fails, just ignore it
-					if (errno() != EINVAL)
+					// not every driver supports TIOCGSERIAL, so if it fails, just ignore it 
+				    // (see also issues #12 and #16)
+				    if (errno() != EINVAL && errno() != ENOTSUP)
 						return r;
 				} else {
 					ss.flags &= ~ASYNC_SPD_MASK;
 					r = ioctl(fd, TIOCSSERIAL, ss);
 					if (r != 0) {
-						// not every driver supports TIOCSSERIAL, so if it fails, just ignore it
-						if (errno() != EINVAL)
+						// not every driver supports TIOCSSERIAL, so if it fails, just ignore it 
+					    // (see also issues #12 and #16)
+					    if (errno() != EINVAL && errno() != ENOTSUP)
 							return r;
 					}
 				}
