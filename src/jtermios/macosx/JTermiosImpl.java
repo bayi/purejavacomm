@@ -64,6 +64,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	static MacOSX_C_lib m_Clib = (MacOSX_C_lib) Native.loadLibrary("c", MacOSX_C_lib.class);
 
 	public interface MacOSX_C_lib extends com.sun.jna.Library {
+		public int pipe(int[] fds);
+
 		public int tcdrain(int fd);
 
 		public void cfmakeraw(termios termios);
@@ -97,6 +99,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		public int select(int n, int[] read, int[] write, int[] error, timeval timeout);
 
 		public int poll(pollfd[] fds, int nfds, int timeout);
+		
+		public int poll(int[] fds, int nfds, int timeout);
 
 		public int tcflush(int fd, int qs);
 
@@ -331,6 +335,11 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
             fds[i].revents = pfds[i].revents;
 		return ret;
 	}
+	
+	public int poll(int fds[], int nfds, int timeout) {
+        return m_Clib.poll(fds, nfds, timeout);
+	}
+
 
 	public FDSet newFDSet() {
 		return new FDSetImpl();
@@ -387,5 +396,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			}
 		}
 		return r;
+	}
+
+	public int pipe(int[] fds) {
+		return m_Clib.pipe(fds);
 	}
 }

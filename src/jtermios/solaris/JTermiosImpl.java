@@ -63,6 +63,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 	static Solaris_C_lib m_Clib = (Solaris_C_lib) Native.loadLibrary("c", Solaris_C_lib.class);
 
 	public interface Solaris_C_lib extends com.sun.jna.Library {
+		public int pipe(int[] fds);
+
 		public int tcdrain(int fd);
 
 		public int fcntl(int fd, int cmd, int[] arg);
@@ -94,6 +96,8 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 		public int select(int n, int[] read, int[] write, int[] error, timeval timeout);
 
 		public int poll(pollfd[] fds, int nfds, int timeout);
+		
+		public int poll(int[] fds, int nfds, int timeout);
 
 		public int tcflush(int fd, int qs);
 
@@ -456,6 +460,10 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			fds[i].revents = pfds[i].revents;
 		return ret;
 	}
+	
+	public int poll(int fds[], int nfds, int timeout) {
+		return m_Clib.poll(fds, nfds, timeout);
+	}
 
 	public FDSet newFDSet() {
 		return new FDSetImpl();
@@ -571,4 +579,9 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 			return r;
 		return 0;
 	}
+	
+	public int pipe(int[] fds) {
+		return m_Clib.pipe(fds);
+	}
+
 }

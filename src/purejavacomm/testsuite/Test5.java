@@ -46,7 +46,7 @@ public class Test5 extends TestBase {
 				public void run() {
 					try {
 						sync(2);
-						m_Port.enableReceiveThreshold(0);
+						m_Port.disableReceiveThreshold();
 						m_Port.enableReceiveTimeout(1000);
 						long T0 = System.currentTimeMillis();
 						byte[] b = { 0 };
@@ -54,9 +54,9 @@ public class Test5 extends TestBase {
 						long dT = System.currentTimeMillis() - T0;
 						if (n != 0)
 							fail("read did not time out as expected, read returned %d > 0", n);
-						if (dT < 1000)
+						if (dT < 1000 - 10)
 							fail("read timed out early, expected 1000 msec, got %d msec", dT);
-						if (dT > 1010)
+						if (dT > 1020)
 							fail("read timed out with suspicious delay, expected 1000 msec, got %d msec", dT);
 					} catch (InterruptedException e) {
 					} catch (Exception e) {

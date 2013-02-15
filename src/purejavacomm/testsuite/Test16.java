@@ -27,41 +27,63 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
 package purejavacomm.testsuite;
 
-import com.sun.jna.Native;
+import java.util.Enumeration;
 
-public class TestSuite {
-	public static void main(String[] args) {
-		//Native.setProtected(false);
-		TestBase.init(args);
-		//jtermios.JTermios.JTermiosLogging.setLogMask(255);
-		//System.setProperty("purejavacomm.usepoll", "true");
-		//System.setProperty("purejavacomm.rawreadmode", "true");
+import purejavacomm.CommPortIdentifier;
+
+public class Test16 extends TestBase {
+
+	@SuppressWarnings("unchecked")
+	static void run() throws Exception {
+
+		Enumeration<CommPortIdentifier> cpiEnum;
+		
+		String origOwnerName = null;
+		String checkOwnerName = null;
+		
 		try {
-			System.out.println("PureJavaComm Test Suite");
-			System.out.println("Using port: " + TestBase.getPortName());
-			Test1.run();
-			Test2.run(19200);
-			Test3.run();
-			Test4.run();
-			Test5.run();
-			Test6.run();
-			Test7.run();
-			Test8.run();
-			Test9.run();
-			Test10.run();
-			Test11.run();
-			Test12.run();
-			Test13.run();
-			Test15.run();
-			Test16.run();
-			System.out.println("All tests passed OK.");
-		} catch (TestBase.TestFailedException e) {
-			System.out.println("Test failure");
-		} catch (Exception e) {
-			e.printStackTrace();
+
+			begin("Test16 - port ownership");
+			
+			openPort();
+
+			//first call to enumerate port identifiers
+			cpiEnum = CommPortIdentifier.getPortIdentifiers();
+			
+			//get original owner name
+			while (cpiEnum.hasMoreElements()) {
+				CommPortIdentifier cpi = cpiEnum.nextElement();
+				if (cpi.getName().equals(getPortName())) {
+					origOwnerName = cpi.getCurrentOwner();
+					break;
+				}
+			}
+
+			//second call to enumerate port identifiers
+			cpiEnum = CommPortIdentifier.getPortIdentifiers();
+
+			//get owner name again
+			while (cpiEnum.hasMoreElements()) {
+				CommPortIdentifier cpi = cpiEnum.nextElement();
+				if (cpi.getName().equals(getPortName())) {
+					checkOwnerName = cpi.getCurrentOwner();
+					break;
+				}
+			}
+			
+			//these should be exactly the same
+			if (checkOwnerName == null || !checkOwnerName.equals(origOwnerName)) {
+				fail("Owner name incorrectly changed simply by reenumerating ports." + origOwnerName + " vs. " + checkOwnerName);
+			}
+			else {
+				finishedOK();
+			}
+			
+		} finally {
+			closePort();
 		}
+
 	}
 }

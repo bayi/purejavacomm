@@ -185,14 +185,20 @@ public class JTermios {
 	public static int B921600 = 921600;
 	// poll.h stuff
 	public static short POLLIN = 0x0001;
+	public static int POLLIN_IN = 0x0001; // for use with poll(int[]...)
+	public static int POLLIN_OUT = 0x0001; // for use with poll(int[]...)
 	//public static short POLLRDNORM = 0x0040; // Not Linux
 	//public static short POLLRDBAND = 0x0080; // Not Linux
 	public static short POLLPRI = 0x0002;
 	public static short POLLOUT = 0x0004;
+	public static int POLLOUT_IN = 0x0004; // for use with poll(int[]...)
+	public static int POLLOUT_OUT = 0x0004; // for use with poll(int[]...)
 	//public static short POLLWRNORM = 0x0004; // Not Linux
 	//public static short POLLWRBAND = 0x0100; // Not Linux
 	public static short POLLERR = 0x0008;
+	public static short POLLERR_OUT = 0x0008;
 	public static short POLLNVAL = 0x0020;
+	public static int POLLNVAL_OUT = 0x0020;
 
 	// misc stuff
 	public static int DC1 = 0x11; // Ctrl-Q;
@@ -205,6 +211,7 @@ public class JTermios {
 	private static JTermiosInterface m_Termios;
 
 	public interface JTermiosInterface {
+		int pipe(int[] fds);
 
 		void shutDown();
 
@@ -252,6 +259,8 @@ public class JTermios {
 		 */
 		int poll(Pollfd[] fds, int nfds, int timeout);
 
+		int poll(int[] fds, int nfds, int timeout);
+
 		void perror(String msg);
 
 		FDSet newFDSet();
@@ -275,11 +284,6 @@ public class JTermios {
 	}
 
 	static { // INSTANTIATION 
-		String loglevel = System.getProperty("purejavacomm.loglevel");
-		if (loglevel != null)
-			JTermiosLogging.setLogLevel(Integer.parseInt(loglevel));
-		else
-			JTermiosLogging.setLogLevel(0);
 		int path_max;
 		if (Platform.isMac()) {
 			m_Termios = new jtermios.macosx.JTermiosImpl();
@@ -448,6 +452,20 @@ public class JTermios {
 		return ret;
 	}
 
+	static public int poll(int[] fds, int nfds, int timeout) {
+		log = log && log(5, "> poll(%s,%d,%d)\n", log(fds, 8), nfds, timeout);
+		int ret = m_Termios.poll(fds, nfds, timeout);
+		log = log && log(3, "< poll(%s,%d,%d) => %d\n", log(fds, 8), nfds, timeout, ret);
+		return ret;
+	}
+
+	static public int pipe(int[] fds) {
+		log = log && log(5, "> pipe([%d,%d,%d])\n", fds.length, fds[0], fds[1]);
+		int ret = m_Termios.pipe(fds);
+		log = log && log(3, "< pipe([%d,%d,%d]) => %d\n", fds.length, fds[0], fds[1], ret);
+		return ret;
+	}
+
 	static public void perror(String msg) {
 		m_Termios.perror(msg);
 	}
@@ -487,8 +505,14 @@ public class JTermios {
 	}
 
 	public static class JTermiosLogging {
-		private static int LOG_MASK;
-		public static boolean log;
+		private static int LOG_MASK = 0;
+		public static boolean log = false;
+
+		static { // initialization 
+			String loglevel = System.getProperty("purejavacomm.loglevel");
+			if (loglevel != null)
+				setLogLevel(Integer.parseInt(loglevel));
+		}
 
 		public static String lineno() {
 			return lineno(0);
@@ -514,6 +538,19 @@ public class JTermios {
 			for (int i = 0; i < n; i++)
 				b.append(String.format(",0x%02X", bts[i]));
 			if (n < bts.length)
+				b.append("...");
+			b.append("]");
+			return b.toString();
+		}
+
+		public static String log(int[] ints, int n) {
+			StringBuffer b = new StringBuffer();
+			if (n < 0 || n > ints.length)
+				n = ints.length;
+			b.append(String.format("[%d", ints.length));
+			for (int i = 0; i < n; i++)
+				b.append(String.format(",0x%08X", ints[i]));
+			if (n < ints.length)
 				b.append("...");
 			b.append("]");
 			return b.toString();
@@ -550,14 +587,20 @@ public class JTermios {
 		static private StringBuffer buffer = new StringBuffer();
 
 		static public boolean log(int l, String format, Object... args) {
-			if (LOG_MASK != 0) {
+			if (l == 0 || LOG_MASK != 0) {
 				synchronized (buffer) {
 					buffer.setLength(0);
-					if ((LOG_MASK & (1 << (6 - 1))) != 0)
-						buffer.append(String.format(lineno(2) + ", "));
-					if ((LOG_MASK & (1 << (7 - 1))) != 0)
-						buffer.append(String.format(Thread.currentThread().getName() + ", "));
-					if ((LOG_MASK & (1 << (l - 1))) != 0)
+					if ((LOG_MASK & (1 << (5))) != 0)
+						buffer.append(String.format("%06d,", System.currentTimeMillis() % 1000000));
+					if ((LOG_MASK & (1 << (6))) != 0) {
+						buffer.append(lineno(2));
+						buffer.append(", ");
+					}
+					if ((LOG_MASK & (1 << (7))) != 0) {
+						buffer.append(Thread.currentThread().getName());
+						buffer.append(", ");
+					}
+					if (l == 0 || (LOG_MASK & (1 << (l - 1))) != 0)
 						buffer.append(String.format(format, args));
 					if (buffer.length() > 0) {
 						System.err.printf("log: " + buffer.toString());

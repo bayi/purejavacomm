@@ -32,74 +32,52 @@ package purejavacomm.testsuite;
 import purejavacomm.SerialPortEvent;
 import purejavacomm.SerialPortEventListener;
 
-public class Test6 extends TestBase {
-	private static Exception m_Exception = null;
-	private static Thread m_Receiver;
-	private static Thread m_Transmitter;
-
+public class Test15 extends TestBase {
 	static void run() throws Exception {
+
 		try {
-			begin("Test6 - threshold + timeout");
+			int timeout = 100;
+			begin("Test15 - treshold disabled, timeout == " + timeout);
 			openPort();
-			m_Port.setSerialPortParams(230000, 8, 1, 0);
-			//m_In = purejavacomm.RawStream.getInputStream(m_Port);
-			// receiving thread
-			m_Receiver = new Thread(new Runnable() {
-				public void run() {
-					try {
-						sync(2);
-						m_Port.enableReceiveThreshold(4);
-						m_Port.enableReceiveTimeout(10000);
-						//purejavacomm.RawStream.configureThresholdTimeout(m_Port, 4, 2000);
-						byte[] b = new byte[4];
-						for (int i = 0; i < 1000; i++) {
-							long T0 = System.currentTimeMillis();
-							int n = m_In.read(b);
-							long dT = System.currentTimeMillis() - T0;
-							if (n != 4)
-								fail("read did not get 4 bytes as expected, got %d ", n);
-							if (dT >= 1000)
-								fail("read timed out though we got 4 bytes "+dT);
-						}
+			m_Out = m_Port.getOutputStream();
+			m_In = m_Port.getInputStream();
 
-					} catch (InterruptedException e) {
-					} catch (Exception e) {
-						if (m_Exception == null)
-							m_Exception = e;
-						m_Receiver.interrupt();
-						m_Transmitter.interrupt();
-					}
-				};
-			});
+			final byte[] txbuffer = new byte[1000];
+			final byte[] rxbuffer = new byte[txbuffer.length];
 
-			// sending thread
-			m_Transmitter = new Thread(new Runnable() {
-				public void run() {
-					try {
-						sync(2);
-						for (int i = 0; i < 1000; i++)
-							m_Out.write(new byte[4]);
-					} catch (InterruptedException e) {
-					} catch (Exception e) {
-						e.printStackTrace();
-						if (m_Exception == null)
-							m_Exception = e;
-						m_Receiver.interrupt();
-						m_Transmitter.interrupt();
-					}
-				};
-			});
+			m_Port.enableReceiveTimeout(100);
+			m_Port.disableReceiveThreshold();
 
-			m_Transmitter.start();
-			sleep(100);
-			m_Receiver.start();
-
-			while (m_Receiver.isAlive() || m_Transmitter.isAlive()) {
-				sleep(100);
+			{
+				long T0 = System.currentTimeMillis();
+				int n = m_In.read(rxbuffer, 0, 10);
+				long T1 = System.currentTimeMillis();
+				if (n != 0)
+					fail("was expecting 0 bytes, but got " + n + " bytes");
+				int timeLo = timeout;
+				int timeHi = timeout * 110 / 100;
+				int time = (int) (T1 - T0);
+				if (time < timeLo)
+					fail("timed out early, was expecting  " + timeLo + " but got " + time + " msec");
+				if (time > timeHi)
+					fail("timed out late, was expecting  " + timeHi + " but got " + time + " msec");
 			}
 
-			if (m_Exception != null)
-				throw m_Exception;
+			{
+				m_Out.write(txbuffer, 0, 1000); // at 9600 this should take about 1 sec 
+				sleep(50); // give time to about 50 chars to loop back
+				long T0 = System.currentTimeMillis();
+				int n = m_In.read(rxbuffer, 0, 1000);
+				long T1 = System.currentTimeMillis();
+				int time = (int) (T1 - T0);
+				int etime= n * 150/100; // at 9600
+				if (time > etime)
+					fail("expected read to return in " + etime+" but it took " + time + " msec and returned "+n +" bytes");
+				if (n < 10)
+					fail("was expecting at least 900 bytes, but got " + n + " bytes");
+			}
+
+			
 			finishedOK();
 		} finally {
 			closePort();
