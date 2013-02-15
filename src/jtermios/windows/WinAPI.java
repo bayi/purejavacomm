@@ -30,12 +30,12 @@
 
 package jtermios.windows;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.*;
 import com.sun.jna.ptr.IntByReference;
+
 import static jtermios.JTermios.JTermiosLogging.*;
 
 /**

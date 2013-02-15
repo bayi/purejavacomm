@@ -30,8 +30,6 @@
 
 package purejavacomm.testsuite;
 
-import com.sun.jna.Native;
-
 public class TestSuite {
 	public static void main(String[] args) {
 		//Native.setProtected(false);

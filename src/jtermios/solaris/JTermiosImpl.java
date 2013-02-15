@@ -31,8 +31,6 @@ package jtermios.solaris;
 
 import java.io.File;
 
-import java.nio.Buffer;
-
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -47,12 +45,9 @@ import jtermios.Termios;
 import jtermios.TimeVal;
 import jtermios.solaris.JTermiosImpl.Solaris_C_lib.pollfd;
 
-import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLong;
 import com.sun.jna.Structure;
-import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.ptr.NativeLongByReference;
 
 import static jtermios.JTermios.*;
 import static jtermios.JTermios.JTermiosLogging.log;

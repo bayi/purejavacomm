@@ -31,7 +31,6 @@
 package jtermios.testsuite;
 
 import static jtermios.JTermios.*;
-import static jtermios.windows.WinAPI.*;
 
 import java.util.List;
 
@@ -122,6 +121,6 @@ public class JTermiosDemo {
 		}
 
 		System.out.println("Received    '" + new String(rx) + "'");
-		int ec = close(fd);
+		close(fd);
 	}
 }

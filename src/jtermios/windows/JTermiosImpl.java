@@ -30,19 +30,17 @@
 
 package jtermios.windows;
 
-import java.io.File;
-import java.nio.ByteBuffer;
-
 import java.util.*;
 import java.util.regex.Pattern;
+
+import jtermios.*;
+import jtermios.windows.WinAPI.*;
 
 import com.sun.jna.*;
 import com.sun.jna.ptr.IntByReference;
 
 import static jtermios.JTermios.*;
 import static jtermios.JTermios.JTermiosLogging.*;
-import jtermios.*;
-import jtermios.windows.WinAPI.*;
 import static jtermios.windows.WinAPI.*;
 import static jtermios.windows.WinAPI.DCB.*;
 
@@ -364,8 +362,6 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 				if (length == 0)
 					return 0;
 
-				int error;
-
 				if ((port.m_OpenFlags & O_NONBLOCK) != 0) {
 					clearCommErrors(port);
 					int available = port.m_COMSTAT.cbInQue;
@@ -476,8 +472,6 @@ public class JTermiosImpl implements jtermios.JTermios.JTermiosInterface {
 					if (length > room)
 						length = room;
 				}
-
-				int old_flag;
 
 				if (!ResetEvent(port.m_WrOVL.hEvent))
 					port.fail();

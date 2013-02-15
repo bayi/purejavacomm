@@ -42,8 +42,6 @@ import static jtermios.JTermios.JTermiosLogging.*;
 
 import static jtermios.JTermios.*;
 
-import com.sun.jna.Platform;
-
 public class PureJavaSerialPort extends SerialPort {
 	final boolean USE_POLL;
 	final boolean RAW_READ_MODE;

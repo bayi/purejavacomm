@@ -31,9 +31,6 @@ package purejavacomm.testsuite;
 
 import java.io.IOException;
 
-import purejavacomm.SerialPortEvent;
-import purejavacomm.SerialPortEventListener;
-
 public class Test11 extends TestBase {
 	static volatile boolean m_ReadThreadRunning;
 

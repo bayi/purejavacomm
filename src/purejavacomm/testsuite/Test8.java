@@ -29,8 +29,6 @@
  */
 package purejavacomm.testsuite;
 
-import java.util.Arrays;
-
 import purejavacomm.*;
 
 public class Test8 extends TestBase {
